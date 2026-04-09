@@ -540,6 +540,17 @@ function submitApply(){
       updateBanner(liveStats); renderMenu(); checkOverlays();
       showSuccess({dept,grade,sid,name,date:selectedDate,time:timeStr,pay:selectedPay,menu:menuStr}); return;
     }
+    if(resData&&resData.status==='busy'){
+      // 동시 접속 집중 → 2초 후 자동 재시도
+      const btn=document.getElementById('submitBtn');
+      btn.innerHTML='⏳ 잠시 후 재시도 중... (2초)';
+      setTimeout(function(){
+        btn.innerHTML='🍱 천원의 아침밥 신청하기';
+        btn.disabled=false;
+        submitApply();
+      },2000);
+      return;
+    }
     if(resData&&resData.status==='duplicate'){alert('⚠️ 이미 해당 날짜에 신청이 완료된 학번입니다.');document.getElementById('submitBtn').disabled=false;return;}
     alert('❌ 신청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     document.getElementById('submitBtn').disabled=false;
