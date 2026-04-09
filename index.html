@@ -269,7 +269,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 // ══════════════════════════════════════════
 //  설정
 // ══════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxNTGgNwgfpbS5NhCOCqrJ_-lFF7EaWm0iJLVcuXlnD4p2CNmf7ULD2mCdBn8-Pzfw2/exec';
+const GAS_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
 const LS = {
@@ -277,7 +277,10 @@ const LS = {
   set: (k, v) => { try { localStorage.setItem('yuhan_bf_'+k, JSON.stringify(v)); } catch(e){} }
 };
 
-function getMenuData() { return LS.get('menu', getDefaultMenuData()); }
+function getMenuData() {
+  // localStorage 캐시 우선 (loadAll에서 GAS 식단을 캐시해 둠)
+  return LS.get('menu', getDefaultMenuData());
+}
 function getDefaultMenuData() {
   return {
     '2026-04-01':{ menus:['천원의 랍스타(특식)'], qty:300 },
@@ -551,10 +554,34 @@ function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
 function closeModal(){ document.getElementById('successModal').classList.remove('show'); }
 
 document.addEventListener('DOMContentLoaded',function(){
-  applyAccountInfo(); buildDateTabs(); checkOverlays();
+  // GAS에서 식단+설정 로드 후 화면 초기화
+  if(GAS_URL.includes('YOUR_DEPLOYMENT_ID')){
+    // 데모 모드: localStorage/기본값 사용
+    applyAccountInfo(); buildDateTabs(); checkOverlays();
+  } else {
+    // 실연동: GAS에서 식단 먼저, 그다음 설정 로드
+    fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
+      if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
+        LS.set('menu',menuRes.data); // localStorage 캐시
+      }
+      fetchFromGAS({action:'getSettings'},function(setRes,setErr){
+        if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
+          const d=setRes.data;
+          const acct={bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'};
+          LS.set('account',acct);
+          if(d.startTime||d.endTime) LS.set('time_settings',{start:d.startTime||'08:30',end:d.endTime||'10:30'});
+          if(d.soldoutManual!==undefined||d.soldoutMsg){
+            LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+          }
+        }
+        applyAccountInfo(); buildDateTabs(); checkOverlays();
+      });
+    });
+  }
   updateClock(); setInterval(updateClock,1000);
-  setInterval(loadLiveStats,30000);
-  setInterval(checkOverlays,30000); // 30초마다 종료/시간 체크
+  setInterval(function(){
+    loadLiveStats(); checkOverlays();
+  },30000);
 });
 </script>
 </body>
