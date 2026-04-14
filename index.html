@@ -428,7 +428,7 @@ function renderMenu(){
     const dt=new Date(selectedDate);
     const badge=(dt.getMonth()+1)+'월 '+(dt.getDate())+'일 ('+DAY_NAMES[dt.getDay()]+') 메뉴';
     const totalQty=data.qty; const soldQty=liveStats.sold||0; const remainQty=Math.max(0,totalQty-soldQty);
-    const isSoldOut=remainQty<=0; const isLow=remainQty>0&&remainQty<=20;
+    const isSoldOut=remainQty<=0||checkSoldOut(selectedDate); const isLow=remainQty>0&&remainQty<=20&&!checkSoldOut(selectedDate);
     const items=data.menus.filter(m=>!m.startsWith('(')).map(m=>'<div class="menu-item"><div class="menu-dot"></div><span>'+m+'</span></div>').join('');
     const brand=data.menus.find(m=>m.startsWith('('))||'';
     if(isSoldOut&&!isLocked){
@@ -437,11 +437,14 @@ function renderMenu(){
       el.innerHTML='<div class="menu-card"><div class="menu-top"><div class="menu-date-badge">🍽️ '+badge+'</div><div class="qty-badge-wrap">'+(isLocked?'':'<div class="qty-badge qb-total"><span class="qv">'+totalQty+'</span>수량</div><div class="qty-badge qb-remain '+(isLow?'low':'')+'"><span class="qv">'+remainQty+'</span>잔여</div>')+'</div></div>'+items+(brand?'<div style="font-size:10px;color:var(--gray500);margin-top:5px;font-weight:600">'+brand+'</div>':'')+'</div>';
     }
   }
+  const manualSoldOut = checkSoldOut(selectedDate); // 수동종료 포함 판매종료 여부
   if(isLocked){
     el.insertAdjacentHTML('beforeend','<div class="lock-notice"><div class="li">🔒</div><p>'+fDateKr(selectedDate)+' 메뉴 미리보기</p><small>신청은 해당 날짜 당일에만 가능합니다</small></div>');
     document.getElementById('submitBtn').disabled=true;
     document.getElementById('submitBtn').innerHTML='🔒 당일에만 신청 가능';
-  }else if(data&&liveStats.remain===0&&liveStats.sold>0){
+  }else if(manualSoldOut||(data&&liveStats.remain===0&&liveStats.sold>0)){
+    // 수동 종료 OR 잔여 0 → 버튼 비활성화
+    const so=LS.get('soldout_settings',{msg:'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
     document.getElementById('submitBtn').disabled=true;
     document.getElementById('submitBtn').innerHTML='⛔ 판매 종료';
   }else{
@@ -461,9 +464,19 @@ function loadLiveStats(){
     updateBanner(liveStats); renderMenu(); return;
   }
   fetchFromGAS({action:'getStats',date:selectedDate},function(data,err){
-    if(!err&&data&&data.status==='ok'){ liveStats={total:data.total,sold:data.sold,remain:data.remain}; }
-    else{ const d=MENU_DATA[selectedDate]; liveStats={total:d?d.qty:0,sold:0,remain:d?d.qty:0}; }
-    updateBanner(liveStats); renderMenu();
+    if(!err&&data&&data.status==='ok'){
+      liveStats={total:data.total,sold:data.sold,remain:data.remain};
+      // ✅ GAS에서 수동종료 상태 수신 → localStorage 즉시 갱신
+      if(data.soldoutManual!==undefined){
+        const so=LS.get('soldout_settings',{manual:false,msg:'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+        so.manual=(data.soldoutManual===true||data.soldoutManual==='true');
+        if(data.soldoutMsg) so.msg=data.soldoutMsg;
+        LS.set('soldout_settings',so);
+      }
+    } else {
+      const d=MENU_DATA[selectedDate]; liveStats={total:d?d.qty:0,sold:0,remain:d?d.qty:0};
+    }
+    updateBanner(liveStats); renderMenu(); checkOverlays();
   });
 }
 
@@ -501,6 +514,11 @@ function validate(){
   if(document.getElementById('studentName').value.trim().length<2){alert('성명을 입력해주세요.');return false;}
   if(!selectedDate){alert('이용 날짜를 선택해주세요.');return false;}
   if(selectedDate!==todayStr){alert('❌ 신청은 해당 날짜 당일에만 가능합니다.');return false;}
+  // 수동 판매종료 체크 (관리자 설정 우선)
+  if(checkSoldOut(selectedDate)){
+    const so=LS.get('soldout_settings',{msg:'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+    alert('⛔ '+so.msg);return false;
+  }
   // 신청 시간 확인
   const ts = getTimeSettings();
   const startMin = parseTime(ts.start||'08:30');
