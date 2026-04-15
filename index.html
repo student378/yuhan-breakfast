@@ -547,7 +547,8 @@ function validate(){
   if(!document.getElementById('grade').value){alert('학년을 선택해주세요.');return false;}
   const sid=sanitizeInput(document.getElementById('studentId').value);
   document.getElementById('studentId').value=sid;
-  if(!sid||sid.length!==9||!/^\d+$/.test(sid)){alert('학번을 정확히 입력해주세요. (숫자만)');return false;}
+if(!sid||!/^\d+$/.test(sid)){alert('학번은 숫자만 입력해주세요.');return false;}
+if(sid.length!==9){alert('학번은 9자리로 입력해주세요.\n현재 '+sid.length+'자리 입력됨');return false;}  
   const nameRaw=sanitizeInput(document.getElementById('studentName').value);
   document.getElementById('studentName').value=nameRaw;
   if(nameRaw.length<2){alert('성명을 입력해주세요.');return false;}
