@@ -2,7 +2,11 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdn.jsdelivr.net https://script.google.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://script.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none';">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1d4ed8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>천원의 아침밥 신청</title>
@@ -269,6 +273,17 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 // ══════════════════════════════════════════
 //  설정
 // ══════════════════════════════════════════
+// ── HTML 이스케이프 (XSS 방어) ──
+function esc(s){
+  if(s===null||s===undefined) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#x27;')
+    .replace(/`/g,'&#x60;');
+}
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxNTGgNwgfpbS5NhCOCqrJ_-lFF7EaWm0iJLVcuXlnD4p2CNmf7ULD2mCdBn8-Pzfw2/exec';
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
@@ -322,13 +337,13 @@ let isBeforeTime = false;
 let isSoldOutState = false;
 
 // ── 시간 설정 ──
-function getTimeSettings() { return LS.get('time_settings', {start:'08:30',end:'10:30'}); }
+function getTimeSettings() { return LS.get('time_settings', {start:'08:25',end:'10:30'}); }
 
 function parseTime(t) { const [h,m]=t.split(':').map(Number); return h*60+m; }
 
 function checkTimeState() {
   const ts = getTimeSettings();
-  const startMin = parseTime(ts.start||'08:30');
+  const startMin = parseTime(ts.start||'08:25');
   const now = new Date();
   const nowMin = now.getHours()*60+now.getMinutes();
   return nowMin < startMin;
@@ -376,7 +391,7 @@ function checkOverlays() {
   // 판매 종료
   if (isTodayOperating && checkSoldOut(today)) {
     const so = LS.get('soldout_settings',{msg:'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
-    document.getElementById('overlaySoldMsg').innerHTML = so.msg.replace(/\n/g,'<br>');
+    document.getElementById('overlaySoldMsg').innerHTML = esc(so.msg).replace(/\n/g,'<br>');
     document.getElementById('overlaySold').classList.add('show');
     isSoldOutState = true;
   } else {
@@ -395,12 +410,12 @@ function buildDateTabs() {
   container.innerHTML = '';
   const today = new Date(); todayStr = fDate(today);
   const operDates = Object.keys(MENU_DATA).sort();
-  const show = operDates.filter(d=>{ const diff=(new Date(d)-today)/86400000; return diff>=-3&&diff<=10; });
+  const show = operDates.filter(d=>{ const diff=(new Date(d+'T00:00:00')-today)/86400000; return diff>=-3&&diff<=10; });
   if(!show.length){ container.innerHTML='<div style="font-size:12px;color:var(--gray500)">이번 주 운영일이 없습니다</div>'; return; }
   let defaultDate = show.find(d=>d>=todayStr)||show[show.length-1];
   selectedDate = defaultDate;
   show.forEach(d=>{
-    const dt=new Date(d); const isToday=d===todayStr; const isLocked=d!==todayStr;
+    const dt=new Date(d+'T00:00:00'); const isToday=d===todayStr; const isLocked=d!==todayStr;
     const label=(dt.getMonth()+1)+'/'+(dt.getDate())+'('+DAY_NAMES[dt.getDay()]+')';
     const btn=document.createElement('button');
     btn.className='date-tab'+(d===defaultDate?' active':'')+(isToday?' today-tab':'')+(isLocked?' locked':'');
@@ -425,7 +440,7 @@ function renderMenu(){
   const isLocked=selectedDate!==todayStr;
   if(!data){ el.innerHTML='<div class="menu-card"><div class="no-menu">📭 해당 날짜 메뉴 정보가 없습니다</div></div>'; }
   else{
-    const dt=new Date(selectedDate);
+    const dt=new Date(selectedDate+'T00:00:00');
     const badge=(dt.getMonth()+1)+'월 '+(dt.getDate())+'일 ('+DAY_NAMES[dt.getDay()]+') 메뉴';
     const totalQty=data.qty; const soldQty=liveStats.sold||0; const remainQty=Math.max(0,totalQty-soldQty);
     const isSoldOut=remainQty<=0||checkSoldOut(selectedDate); const isLow=remainQty>0&&remainQty<=20&&!checkSoldOut(selectedDate);
@@ -490,7 +505,7 @@ function updateBanner(stats){
 // ── 시계 ──
 function updateClock(){
   const ts = getTimeSettings();
-  const startMin = parseTime(ts.start||'08:30');
+  const startMin = parseTime(ts.start||'08:25');
   const now = new Date();
   const nowMin = now.getHours()*60+now.getMinutes();
   const timeStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
@@ -506,12 +521,16 @@ function updateClock(){
 
 function selectPay(method){ selectedPay=method; document.getElementById('payTransfer').classList.toggle('selected',method==='계좌이체'); document.getElementById('payCash').classList.toggle('selected',method==='현금지급'); }
 
+function sanitizeInput(s){ return String(s||'').replace(/[<>"'`&;=]/g,'').trim(); }
 function validate(){
   if(!document.getElementById('dept').value){alert('학과를 선택해주세요.');return false;}
   if(!document.getElementById('grade').value){alert('학년을 선택해주세요.');return false;}
-  const sid=document.getElementById('studentId').value.trim();
-  if(!sid||sid.length<7){alert('학번을 정확히 입력해주세요.');return false;}
-  if(document.getElementById('studentName').value.trim().length<2){alert('성명을 입력해주세요.');return false;}
+  const sid=sanitizeInput(document.getElementById('studentId').value);
+  document.getElementById('studentId').value=sid;
+  if(!sid||sid.length<7||!/^\d+$/.test(sid)){alert('학번을 정확히 입력해주세요. (숫자만)');return false;}
+  const nameRaw=sanitizeInput(document.getElementById('studentName').value);
+  document.getElementById('studentName').value=nameRaw;
+  if(nameRaw.length<2){alert('성명을 입력해주세요.');return false;}
   if(!selectedDate){alert('이용 날짜를 선택해주세요.');return false;}
   if(selectedDate!==todayStr){alert('❌ 신청은 해당 날짜 당일에만 가능합니다.');return false;}
   // 수동 판매종료 체크 (관리자 설정 우선)
@@ -521,7 +540,7 @@ function validate(){
   }
   // 신청 시간 확인
   const ts = getTimeSettings();
-  const startMin = parseTime(ts.start||'08:30');
+  const startMin = parseTime(ts.start||'08:25');
   const now = new Date(); const nowMin = now.getHours()*60+now.getMinutes();
   if(nowMin<startMin){alert('⏰ 신청 시간이 아닙니다.\n'+ts.start+' 이후부터 신청 가능합니다.');return false;}
   if(!selectedPay){alert('송금 방법을 선택해주세요.');return false;}
@@ -530,10 +549,10 @@ function validate(){
 }
 
 function fetchFromGAS(params,callback){
-  const cbName='cb_'+Date.now(); const script=document.createElement('script');
+  const cbName='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const script=document.createElement('script');
   const timeout=setTimeout(()=>{delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(null,'timeout');},10000);
   window[cbName]=function(data){clearTimeout(timeout);delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(data,null);};
-  const query=new URLSearchParams({...params,callback:cbName}); script.src=GAS_URL+'?'+query; document.body.appendChild(script);
+  const qParts=Object.entries({...params,callback:cbName}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&'); script.src=GAS_URL+'?'+qParts; document.body.appendChild(script);
 }
 
 function submitApply(){
@@ -593,28 +612,39 @@ document.addEventListener('DOMContentLoaded',function(){
     // 데모 모드: localStorage/기본값 사용
     applyAccountInfo(); buildDateTabs(); checkOverlays();
   } else {
-    // 실연동: GAS 오류/타임아웃 시에도 반드시 화면 초기화
+    // ✅ 즉시 렌더 (캐시 우선) — 로딩 체감 속도 개선
     function initScreen(){ applyAccountInfo(); buildDateTabs(); checkOverlays(); }
+    initScreen(); // localStorage 캐시로 즉시 화면 표시
+
+    // GAS에서 최신 데이터 병렬 로드 후 업데이트
+    let menuDone=false, settingsDone=false;
+    function onBothDone(){ if(menuDone&&settingsDone){ applyAccountInfo(); buildDateTabs(); checkOverlays(); } }
+
     fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
       try{
         if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
           LS.set('menu',menuRes.data);
         }
       }catch(e){}
-      fetchFromGAS({action:'getSettings'},function(setRes,setErr){
-        try{
-          if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
-            const d=setRes.data;
-            const acct={bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'};
-            LS.set('account',acct);
-            if(d.startTime||d.endTime) LS.set('time_settings',{start:d.startTime||'08:30',end:d.endTime||'10:30'});
-            if(d.soldoutManual!==undefined||d.soldoutMsg){
-              LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
-            }
+      menuDone=true; onBothDone();
+    });
+
+    fetchFromGAS({action:'getSettings'},function(setRes,setErr){
+      try{
+        if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
+          const d=setRes.data;
+          const acct={bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'};
+          LS.set('account',acct);
+          // ✅ 시간 설정 반영 (관리자 설정탭 저장 시 GAS에서 읽어옴)
+          if(d.startTime||d.endTime){
+            LS.set('time_settings',{start:d.startTime||'08:25',end:d.endTime||'10:30'});
           }
-        }catch(e){}
-        initScreen();
-      });
+          if(d.soldoutManual!==undefined||d.soldoutMsg){
+            LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+          }
+        }
+      }catch(e){}
+      settingsDone=true; onBothDone();
     });
   }
   updateClock(); setInterval(updateClock,1000);
