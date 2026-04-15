@@ -270,13 +270,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><div style="font-size:13px;color:#374151;font-weight:600">신청 중...</div></div>
 
 <script>
-// ── 인앱브라우저 감지 ──
-(function(){
-  const ua=navigator.userAgent||'';
-  window.__isInApp=/KAKAOTALK|NAVER|FB_IAB|FBAN|Instagram/i.test(ua);
-  window.__isIOS=/iPhone|iPad|iPod/i.test(ua);
-})();
-
 // ══════════════════════════════════════════
 //  설정
 // ══════════════════════════════════════════
@@ -294,10 +287,9 @@ function esc(s){
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxNTGgNwgfpbS5NhCOCqrJ_-lFF7EaWm0iJLVcuXlnD4p2CNmf7ULD2mCdBn8-Pzfw2/exec';
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
-const __mem = {};
 const LS = {
-  get: (k,def=null)=>{ try{const r=localStorage.getItem('yuhan_bf_'+k);return r?JSON.parse(r):def;}catch(e){return (k in __mem)?__mem[k]:def;} },
-  set: (k,v)=>{ try{localStorage.setItem('yuhan_bf_'+k,JSON.stringify(v));}catch(e){__mem[k]=v;} }
+  get: (k, def=null) => { try { const r=localStorage.getItem('yuhan_bf_'+k); return r?JSON.parse(r):def; } catch(e){return def;} },
+  set: (k, v) => { try { localStorage.setItem('yuhan_bf_'+k, JSON.stringify(v)); } catch(e){} }
 };
 
 function getMenuData() {
@@ -432,7 +424,7 @@ function buildDateTabs() {
     btn.onclick=()=>selectDate(d,btn);
     container.appendChild(btn);
   });
-  renderMenu();
+  renderMenu(); loadLiveStats();
 }
 
 function selectDate(dateKey,btn){
@@ -571,7 +563,7 @@ function submitApply(){
   const sid=document.getElementById('studentId').value.trim(); const name=document.getElementById('studentName').value.trim();
   const MENU_DATA=getMenuData(); const data=MENU_DATA[selectedDate]; const menuStr=data?data.menus.join(' '):'';
   const dupKey='breakfast_'+selectedDate+'_'+sid;
-  if(localStorage.getItem(dupKey)||__mem[dupKey]){alert('⚠️ 이미 '+fDateKr(selectedDate)+' 신청이 완료된 학번입니다.');return;}
+  if(localStorage.getItem(dupKey)){alert('⚠️ 이미 '+fDateKr(selectedDate)+' 신청이 완료된 학번입니다.');return;}
   document.getElementById('loadingOverlay').classList.add('show');
   document.getElementById('submitBtn').disabled=true;
   const params={action:'save',timestamp:now.toISOString(),date:selectedDate,dept,grade,studentId:sid,name,applyTime:timeStr,menu:menuStr,payMethod:selectedPay};
@@ -615,16 +607,6 @@ function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
 function closeModal(){ document.getElementById('successModal').classList.remove('show'); }
 
 document.addEventListener('DOMContentLoaded',function(){
-  if(window.__isInApp){
-    const b=document.createElement('div');
-    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#fff;text-align:center;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;line-height:1.4;';
-    b.innerHTML='⚠️ 카카오·네이버 앱 내 브라우저에서는 신청이 안 될 수 있습니다.<br><b>여기를 눌러 외부 브라우저(Safari·Chrome)로 열어주세요 →</b>';
-    b.onclick=function(){
-      if(window.__isIOS){window.open(location.href,'_blank');}
-      else{location.href='intent://'+location.href.replace(/^https?:\/\//,'')+'#Intent;scheme=https;action=android.intent.action.VIEW;end';}
-    };
-    document.body.insertBefore(b,document.body.firstChild);
-  }
   // GAS에서 식단+설정 로드 후 화면 초기화
   if(GAS_URL.includes('YOUR_DEPLOYMENT_ID')){
     // 데모 모드: localStorage/기본값 사용
