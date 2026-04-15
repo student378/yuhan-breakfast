@@ -10,6 +10,26 @@
 <meta name="theme-color" content="#1d4ed8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>천원의 아침밥 신청</title>
+<script>
+// 카카오톡, 네이버 등 인앱 브라우저 감지 시 외부 기본 브라우저로 자동 전환
+(function() {
+  var ua = navigator.userAgent.toLowerCase();
+  var isKakao = ua.indexOf('kakaotalk') > -1;
+  var isNaver = ua.indexOf('naver') > -1;
+  var targetUrl = location.href;
+
+  if (isKakao) {
+    location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(targetUrl);
+  } else if (isNaver) {
+    if (ua.indexOf('android') > -1) {
+      location.href = 'intent://' + targetUrl.replace(/https?:\/\//i, '') + '#Intent;scheme=https;package=com.android.chrome;end';
+    } else {
+      // iOS 네이버 앱의 경우 사파리 호출
+      location.href = targetUrl + (targetUrl.indexOf('?') === -1 ? '?' : '&') + 'openinbrowser=1';
+    }
+  }
+})();
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -548,11 +568,37 @@ function validate(){
   return true;
 }
 
-function fetchFromGAS(params,callback){
-  const cbName='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const script=document.createElement('script');
-  const timeout=setTimeout(()=>{delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(null,'timeout');},15000);
-  window[cbName]=function(data){clearTimeout(timeout);delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(data,null);};
-  const qParts=Object.entries({...params,callback:cbName}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&'); script.src=GAS_URL+'?'+qParts; document.body.appendChild(script);
+function fetchFromGAS(params, callback) {
+  // 캐시 방지용 타임스탬프 (인앱 브라우저 캐싱 무력화)
+  params._t = Date.now();
+
+  const qParts = Object.entries(params)
+    .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+    .join('&');
+
+  // 15초 타임아웃 (AbortController)
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+
+  fetch(GAS_URL + '?' + qParts, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+    signal: controller.signal
+  })
+  .then(response => {
+    clearTimeout(timer);
+    if (!response.ok) throw new Error('네트워크 응답 오류: ' + response.status);
+    return response.json();
+  })
+  .then(data => {
+    callback(data, null);
+  })
+  .catch(err => {
+    clearTimeout(timer);
+    console.error('Fetch 통신 에러:', err.name === 'AbortError' ? '타임아웃(15초)' : err);
+    callback(null, err.name === 'AbortError' ? 'timeout' : 'error');
+  });
 }
 
 function submitApply(){
