@@ -550,7 +550,7 @@ function validate(){
 
 function fetchFromGAS(params,callback){
   const cbName='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const script=document.createElement('script');
-  const timeout=setTimeout(()=>{delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(null,'timeout');},10000);
+  const timeout=setTimeout(()=>{delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(null,'timeout');},15000);
   window[cbName]=function(data){clearTimeout(timeout);delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(data,null);};
   const qParts=Object.entries({...params,callback:cbName}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&'); script.src=GAS_URL+'?'+qParts; document.body.appendChild(script);
 }
@@ -637,7 +637,20 @@ document.addEventListener('DOMContentLoaded',function(){
           LS.set('account',acct);
           // ✅ 시간 설정 반영 (관리자 설정탭 저장 시 GAS에서 읽어옴)
           if(d.startTime||d.endTime){
-            LS.set('time_settings',{start:d.startTime||'08:25',end:d.endTime||'10:30'});
+            // GAS 스프레드시트가 시간을 Date로 자동변환한 경우 방어
+            const cleanTime=(v,def)=>{
+              if(!v) return def;
+              const s=String(v);
+              // HH:MM 형식이면 그대로 사용
+              if(/^\d{1,2}:\d{2}$/.test(s.trim())) return s.trim();
+              // Date 객체 문자열이면 무시하고 기본값
+              if(s.indexOf('1899')!==-1||s.indexOf('GMT')!==-1) return def;
+              return def;
+            };
+            LS.set('time_settings',{
+              start:cleanTime(d.startTime,'08:25'),
+              end:cleanTime(d.endTime,'10:30')
+            });
           }
           if(d.soldoutManual!==undefined||d.soldoutMsg){
             LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
