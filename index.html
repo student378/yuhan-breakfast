@@ -612,69 +612,34 @@ document.addEventListener('DOMContentLoaded',function(){
     // 데모 모드: localStorage/기본값 사용
     applyAccountInfo(); buildDateTabs(); checkOverlays();
   } else {
-    // ✅ 즉시 렌더 (캐시 우선) — 로딩 체감 속도 개선
+    // 즉시 렌더 (캐시 우선)
     function initScreen(){ applyAccountInfo(); buildDateTabs(); checkOverlays(); }
-    initScreen(); // localStorage 캐시로 즉시 화면 표시
+    initScreen();
 
-   // getSettings 먼저 → 완료 후 화면 갱신
-fetchFromGAS({action:'getSettings'},function(setRes,setErr){
-  try{
-    if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
-      const d=setRes.data;
-      const acct={bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'};
-      LS.set('account',acct);
-      if(d.startTime||d.endTime){
-        LS.set('time_settings',{start:cleanTime(d.startTime,'08:25'),end:cleanTime(d.endTime,'10:30')});
-      }
-      if(d.soldoutManual!==undefined||d.soldoutMsg){
-        LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
-      }
-      initScreen();
-    }
-  }catch(e){}
-});
-
-// getMenu는 백그라운드 — 화면 블로킹 없음
-fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
-  try{
-    if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
-      LS.set('menu',menuRes.data);
-      buildDateTabs(); checkOverlays();
-    }
-  }catch(e){}
-});
-
+    // getSettings 1회 호출 → 설정 반영 후 화면 갱신
     fetchFromGAS({action:'getSettings'},function(setRes,setErr){
       try{
         if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
           const d=setRes.data;
-          const acct={bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'};
-          LS.set('account',acct);
-          // ✅ 시간 설정 반영 (관리자 설정탭 저장 시 GAS에서 읽어옴)
-          if(d.startTime||d.endTime){
-            // GAS 스프레드시트가 시간을 Date로 자동변환한 경우 방어
-            const cleanTime=(v,def)=>{
-              if(!v) return def;
-              const s=String(v);
-              // HH:MM 형식이면 그대로 사용
-              if(/^\d{1,2}:\d{2}$/.test(s.trim())) return s.trim();
-              // Date 객체 문자열이면 무시하고 기본값
-              if(s.indexOf('1899')!==-1||s.indexOf('GMT')!==-1) return def;
-              return def;
-            };
-            LS.set('time_settings',{
-              start:cleanTime(d.startTime,'08:25'),
-              end:cleanTime(d.endTime,'10:30')
-            });
-          }
-          if(d.soldoutManual!==undefined||d.soldoutMsg){
-            LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
-          }
+          LS.set('account',{bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'});
+          if(d.startTime||d.endTime) LS.set('time_settings',{start:cleanTime(d.startTime,'08:25'),end:cleanTime(d.endTime,'10:30')});
+          if(d.soldoutManual!==undefined||d.soldoutMsg) LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+          initScreen();
         }
       }catch(e){}
-      settingsDone=true; onBothDone();
+    });
+
+    // getMenu 백그라운드 (화면 블로킹 없음)
+    fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
+      try{
+        if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
+          LS.set('menu',menuRes.data);
+          buildDateTabs(); checkOverlays();
+        }
+      }catch(e){}
     });
   }
+
   updateClock(); setInterval(updateClock,1000);
   setInterval(function(){
     loadLiveStats(); checkOverlays();
