@@ -270,15 +270,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><div style="font-size:13px;color:#374151;font-weight:600">신청 중...</div></div>
 
 <script>
-// ── 인앱브라우저 감지 (카카오/네이버 등) ──
+// ── 인앱브라우저 감지 ──
 (function(){
-  const ua = navigator.userAgent || '';
-  const isKakao = /KAKAOTALK/i.test(ua);
-  const isNaver = /NAVER/i.test(ua);
-  const isInApp = isKakao || isNaver || /FB_IAB|FBAN|Instagram|Line\//.test(ua);
-  window.__isInApp = isInApp;
-  window.__isIOS   = /iPhone|iPad|iPod/i.test(ua);
-  window.__isAndroid = /Android/i.test(ua);
+  const ua=navigator.userAgent||'';
+  window.__isInApp=/KAKAOTALK|NAVER|FB_IAB|FBAN|Instagram/i.test(ua);
+  window.__isIOS=/iPhone|iPad|iPod/i.test(ua);
 })();
 
 // ══════════════════════════════════════════
@@ -298,17 +294,10 @@ function esc(s){
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxNTGgNwgfpbS5NhCOCqrJ_-lFF7EaWm0iJLVcuXlnD4p2CNmf7ULD2mCdBn8-Pzfw2/exec';
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
-// 인앱브라우저 localStorage 차단 시 메모리로 폴백
 const __mem = {};
 const LS = {
-  get: (k, def=null) => {
-    try { const r=localStorage.getItem('yuhan_bf_'+k); return r?JSON.parse(r):def; }
-    catch(e){ return (k in __mem)?__mem[k]:def; }
-  },
-  set: (k, v) => {
-    try { localStorage.setItem('yuhan_bf_'+k, JSON.stringify(v)); }
-    catch(e){ __mem[k]=v; }
-  }
+  get: (k,def=null)=>{ try{const r=localStorage.getItem('yuhan_bf_'+k);return r?JSON.parse(r):def;}catch(e){return (k in __mem)?__mem[k]:def;} },
+  set: (k,v)=>{ try{localStorage.setItem('yuhan_bf_'+k,JSON.stringify(v));}catch(e){__mem[k]=v;} }
 };
 
 function getMenuData() {
@@ -443,8 +432,7 @@ function buildDateTabs() {
     btn.onclick=()=>selectDate(d,btn);
     container.appendChild(btn);
   });
-  renderMenu();
-  // loadLiveStats는 DOMContentLoaded에서 1회만 호출 (GAS 중복호출 방지)
+  renderMenu(); loadLiveStats();
 }
 
 function selectDate(dateKey,btn){
@@ -590,9 +578,9 @@ function submitApply(){
   fetchFromGAS(params,function(resData,err){
     document.getElementById('loadingOverlay').classList.remove('show');
     if(GAS_URL.includes('YOUR_DEPLOYMENT_ID')||(!err&&resData&&resData.status==='ok')){
-      const _bfKey='bf_sold_'+selectedDate; const prev=parseInt(localStorage.getItem(_bfKey)||__mem[_bfKey]||'0');
-      try{localStorage.setItem('bf_sold_'+selectedDate,String(prev+1));}catch(e){__mem['bf_sold_'+selectedDate]=String(prev+1);}
-      try{localStorage.setItem(dupKey,'1');}catch(e){__mem[dupKey]='1';}
+      const prev=parseInt(localStorage.getItem('bf_sold_'+selectedDate)||'0');
+      localStorage.setItem('bf_sold_'+selectedDate,String(prev+1));
+      localStorage.setItem(dupKey,'1');
       liveStats.sold=prev+1; liveStats.remain=Math.max(0,liveStats.total-liveStats.sold);
       updateBanner(liveStats); renderMenu(); checkOverlays();
       showSuccess({dept,grade,sid,name,date:selectedDate,time:timeStr,pay:selectedPay,menu:menuStr}); return;
@@ -627,54 +615,53 @@ function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
 function closeModal(){ document.getElementById('successModal').classList.remove('show'); }
 
 document.addEventListener('DOMContentLoaded',function(){
-  // ── 인앱브라우저 배너 ──
   if(window.__isInApp){
-    const banner=document.createElement('div');
-    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#fff;text-align:center;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;';
-    banner.textContent='⚠️ 카카오/네이버 앱에서는 신청이 제한됩니다. 눌러서 외부 브라우저로 열기 →';
-    banner.onclick=function(){
-      const url=location.href;
-      if(window.__isIOS){
-        window.open(url,'_blank');
-      } else {
-        location.href='intent://'+url.replace(/^https?:\/\//,'')+'#Intent;scheme=https;action=android.intent.action.VIEW;end';
-      }
+    const b=document.createElement('div');
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#fff;text-align:center;padding:10px 14px;font-size:13px;font-weight:700;cursor:pointer;line-height:1.4;';
+    b.innerHTML='⚠️ 카카오·네이버 앱 내 브라우저에서는 신청이 안 될 수 있습니다.<br><b>여기를 눌러 외부 브라우저(Safari·Chrome)로 열어주세요 →</b>';
+    b.onclick=function(){
+      if(window.__isIOS){window.open(location.href,'_blank');}
+      else{location.href='intent://'+location.href.replace(/^https?:\/\//,'')+'#Intent;scheme=https;action=android.intent.action.VIEW;end';}
     };
-    document.body.insertBefore(banner,document.body.firstChild);
+    document.body.insertBefore(b,document.body.firstChild);
   }
+  // GAS에서 식단+설정 로드 후 화면 초기화
+  if(GAS_URL.includes('YOUR_DEPLOYMENT_ID')){
+    // 데모 모드: localStorage/기본값 사용
+    applyAccountInfo(); buildDateTabs(); checkOverlays();
+  } else {
+    // 즉시 렌더 (캐시 우선)
+    function initScreen(){ applyAccountInfo(); buildDateTabs(); checkOverlays(); }
+    initScreen();
 
-  // ── 즉시 화면 표시 (캐시/기본값) ──
-  function initScreen(){ applyAccountInfo(); buildDateTabs(); checkOverlays(); }
-  initScreen();
-  loadLiveStats(); // 초기 현황 1회 로드
-
-  if(!GAS_URL.includes('YOUR_DEPLOYMENT_ID')){
-    const cleanTime=function(v,def){
-      if(!v) return def;
-      const s=String(v).trim();
-      if(/^\d{1,2}:\d{2}$/.test(s)) return s;
-      return def;
-    };
-    // getSettings → 완료 후 getMenu 순차 (Cold Start 중복 방지)
+    // getSettings 1회 호출 → 설정 반영 후 화면 갱신
     fetchFromGAS({action:'getSettings'},function(setRes,setErr){
-      if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
-        const d=setRes.data;
-        if(d.bank||d.bankNo) LS.set('account',{bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'});
-        if(d.startTime||d.endTime) LS.set('time_settings',{start:cleanTime(d.startTime,'08:25'),end:cleanTime(d.endTime,'10:30')});
-        if(d.soldoutManual!==undefined||d.soldoutMsg) LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
-        applyAccountInfo(); buildDateTabs(); checkOverlays();
-      }
-      fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
+      try{
+        if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
+          const d=setRes.data;
+          LS.set('account',{bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'});
+          if(d.startTime||d.endTime) LS.set('time_settings',{start:cleanTime(d.startTime,'08:25'),end:cleanTime(d.endTime,'10:30')});
+          if(d.soldoutManual!==undefined||d.soldoutMsg) LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+          initScreen();
+        }
+      }catch(e){}
+    });
+
+    // getMenu 백그라운드 (화면 블로킹 없음)
+    fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
+      try{
         if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
           LS.set('menu',menuRes.data);
           buildDateTabs(); checkOverlays();
         }
-      });
+      }catch(e){}
     });
   }
 
   updateClock(); setInterval(updateClock,1000);
-  setInterval(function(){ loadLiveStats(); checkOverlays(); },60000);
+  setInterval(function(){
+    loadLiveStats(); checkOverlays();
+  },30000);
 });
 </script>
 </body>
