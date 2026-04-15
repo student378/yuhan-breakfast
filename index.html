@@ -225,7 +225,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
       </div>
       <div class="form-group">
         <label class="form-label">학번 <span class="req">*</span></label>
-        <input class="form-input" type="text" id="studentId" placeholder="예) 2024123456" maxlength="10" inputmode="numeric">
+        <input class="form-input" type="text" id="studentId" placeholder="예) 202601001" maxlength="9" inputmode="numeric">
       </div>
       <div class="form-group">
         <label class="form-label">성명 <span class="req">*</span></label>
@@ -547,7 +547,7 @@ function validate(){
   if(!document.getElementById('grade').value){alert('학년을 선택해주세요.');return false;}
   const sid=sanitizeInput(document.getElementById('studentId').value);
   document.getElementById('studentId').value=sid;
-  if(!sid||sid.length<7||!/^\d+$/.test(sid)){alert('학번을 정확히 입력해주세요. (숫자만)');return false;}
+  if(!sid||sid.length!==9||!/^\d+$/.test(sid)){alert('학번을 정확히 입력해주세요. (숫자만)');return false;}
   const nameRaw=sanitizeInput(document.getElementById('studentName').value);
   document.getElementById('studentName').value=nameRaw;
   if(nameRaw.length<2){alert('성명을 입력해주세요.');return false;}
