@@ -2,6 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdn.jsdelivr.net https://script.google.com https://script.googleusercontent.com https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://script.google.com https://script.googleusercontent.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com;">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 
@@ -15,6 +18,11 @@
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--primary:#1d4ed8;--primary-dark:#1e3a8a;--primary-light:#eff6ff;--orange:#f97316;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--gray50:#f9fafb;--gray100:#f3f4f6;--gray200:#e5e7eb;--gray300:#d1d5db;--gray500:#6b7280;--gray700:#374151;--gray900:#111827;--radius:12px}
 body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:100vh;padding-bottom:90px}
+/* ✅ 인앱브라우저 배너 여백 */
+body.inapp-detected .app-header{top:44px}
+body.inapp-detected .live-banner{top:116px}
+#inAppBanner{display:none}
+#inAppBanner.show{display:block !important}
 
 /* ── 헤더 ── */
 .app-header{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;padding:16px 20px 14px;text-align:center;position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(29,78,216,.4)}
@@ -155,7 +163,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 </div>
 
 <div class="live-banner">
-  <div class="live-dot"></div>
+  <div class="live-dot" id="liveDot"></div>
   <span class="live-label">실시간 현황</span>
   <div class="live-stats">
     <div class="live-stat"><span class="sv sv-total" id="bannerTotal">—</span><span class="sl" style="color:var(--primary)">판매수량</span></div>
@@ -267,9 +275,70 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
     <button class="modal-btn" onclick="closeModal()">확인</button>
   </div>
 </div>
-<div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><div style="font-size:13px;color:#374151;font-weight:600">신청 중...</div></div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div id="loadingMsg" style="font-size:13px;color:#374151;font-weight:600;text-align:center;margin-top:8px">신청 중...</div>
+  <div id="loadingSubMsg" style="font-size:11px;color:#6b7280;margin-top:4px;text-align:center;display:none">서버 응답을 기다리고 있습니다...<br>최대 40초 소요될 수 있습니다</div>
+</div>
 
 <script>
+// ══════════════════════════════════════════
+//  ✅ FIX1: 인앱브라우저 감지 및 외부 브라우저 유도
+// ══════════════════════════════════════════
+(function(){
+  const ua = navigator.userAgent || '';
+  const isKakao   = /KAKAOTALK/i.test(ua);
+  const isNaver   = /NAVER/i.test(ua);
+  const isLine    = /Line\//.test(ua);
+  const isInApp   = isKakao || isNaver || isLine ||
+                    /FB_IAB|FBAN|Instagram|Twitter|MicroMessenger/i.test(ua);
+  const isIOS     = /iPhone|iPad|iPod/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+
+  if (isInApp) {
+    // 인앱브라우저 감지 → 상단 배너 표시
+    window.__isInAppBrowser = true;
+    document.addEventListener('DOMContentLoaded', function(){
+      const banner = document.createElement('div');
+      banner.id = 'inAppBanner';
+      banner.style.cssText = [
+        'position:fixed','top:0','left:0','right:0','z-index:9999',
+        'background:#f59e0b','color:#fff','text-align:center',
+        'padding:10px 14px','font-size:13px','font-weight:700',
+        'font-family:sans-serif','box-shadow:0 2px 8px rgba(0,0,0,.2)',
+        'cursor:pointer'
+      ].join(';');
+      banner.innerHTML = '⚠️ 인앱브라우저에서는 신청이 제한됩니다. 여기를 눌러 외부 브라우저로 열어주세요 →';
+
+      // 외부 브라우저로 열기
+      banner.addEventListener('click', function(){
+        const url = location.href;
+        if (isIOS && isKakao) {
+          // 카카오 iOS: 공유메뉴로 Safari 열기 유도
+          alert('카카오톡 우측 상단 ··· 메뉴 → "Safari로 열기"를 눌러주세요.');
+        } else if (isAndroid && isKakao) {
+          // 카카오 Android: intent 스킴
+          location.href = 'intent://' + url.replace(/^https?:\/\//, '') +
+            '#Intent;scheme=https;action=android.intent.action.VIEW;end';
+        } else if (isIOS) {
+          window.open(url, '_blank');
+        } else {
+          window.open(url, '_system');
+        }
+      });
+
+      document.body.insertBefore(banner, document.body.firstChild);
+      // 신청 버튼에도 경고 추가
+      document.addEventListener('DOMContentLoaded', function(){
+        const btn = document.getElementById('submitBtn');
+        if (btn) btn.title = '인앱브라우저에서는 신청이 제한됩니다. 외부 브라우저에서 이용하세요.';
+      });
+    });
+  }
+  window.__isInApp = isInApp;
+  window.__isIOS = isIOS;
+})();
+
 // ══════════════════════════════════════════
 //  설정
 // ══════════════════════════════════════════
@@ -287,9 +356,25 @@ function esc(s){
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxNTGgNwgfpbS5NhCOCqrJ_-lFF7EaWm0iJLVcuXlnD4p2CNmf7ULD2mCdBn8-Pzfw2/exec';
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 
+// ✅ FIX3: localStorage 실패(인앱브라우저 차단) 시 메모리 폴백
+const __memStore = {};
 const LS = {
-  get: (k, def=null) => { try { const r=localStorage.getItem('yuhan_bf_'+k); return r?JSON.parse(r):def; } catch(e){return def;} },
-  set: (k, v) => { try { localStorage.setItem('yuhan_bf_'+k, JSON.stringify(v)); } catch(e){} }
+  get: (k, def=null) => {
+    try {
+      const r = localStorage.getItem('yuhan_bf_'+k);
+      return r ? JSON.parse(r) : def;
+    } catch(e) {
+      // localStorage 차단 → 메모리 스토어 사용
+      return (k in __memStore) ? __memStore[k] : def;
+    }
+  },
+  set: (k, v) => {
+    try {
+      localStorage.setItem('yuhan_bf_'+k, JSON.stringify(v));
+    } catch(e) {
+      __memStore[k] = v; // 메모리에 임시 저장
+    }
+  }
 };
 
 function getMenuData() {
@@ -550,12 +635,21 @@ function validate(){
 
 function fetchFromGAS(params,callback){
   const cbName='cb_'+Date.now()+'_'+Math.random().toString(36).slice(2); const script=document.createElement('script');
-  const timeout=setTimeout(()=>{delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(null,'timeout');},15000);
+  const timeout=setTimeout(()=>{delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(null,'timeout');},40000); // ✅ FIX2: GAS Cold Start(30초) 대응
   window[cbName]=function(data){clearTimeout(timeout);delete window[cbName];if(document.body.contains(script))document.body.removeChild(script);callback(data,null);};
   const qParts=Object.entries({...params,callback:cbName}).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&'); script.src=GAS_URL+'?'+qParts; document.body.appendChild(script);
 }
 
 function submitApply(){
+  // ✅ FIX5: 인앱브라우저 최종 경고
+  if(window.__isInApp){
+    const ok = confirm('⚠️ 인앱브라우저에서는 신청이 정상 처리되지 않을 수 있습니다.\n외부 브라우저(Safari/Chrome)에서 신청하시겠습니까?\n\n[확인] = 계속 시도 / [취소] = 외부 브라우저 열기');
+    if(!ok){
+      const banner = document.getElementById('inAppBanner');
+      if(banner) banner.click();
+      return;
+    }
+  }
   if(!validate())return;
   const now=new Date();
   const timeStr=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
@@ -566,9 +660,16 @@ function submitApply(){
   if(localStorage.getItem(dupKey)){alert('⚠️ 이미 '+fDateKr(selectedDate)+' 신청이 완료된 학번입니다.');return;}
   document.getElementById('loadingOverlay').classList.add('show');
   document.getElementById('submitBtn').disabled=true;
+  // ✅ GAS 응답 지연 안내 (5초 후 표시)
+  const __loadingTimer = setTimeout(()=>{
+    const sm = document.getElementById('loadingSubMsg');
+    if(sm) sm.style.display='block';
+  }, 5000);
   const params={action:'save',timestamp:now.toISOString(),date:selectedDate,dept,grade,studentId:sid,name,applyTime:timeStr,menu:menuStr,payMethod:selectedPay};
   fetchFromGAS(params,function(resData,err){
     document.getElementById('loadingOverlay').classList.remove('show');
+    clearTimeout(window.__loadingTimer||0);
+    const sm2=document.getElementById('loadingSubMsg');if(sm2)sm2.style.display='none';
     if(GAS_URL.includes('YOUR_DEPLOYMENT_ID')||(!err&&resData&&resData.status==='ok')){
       const prev=parseInt(localStorage.getItem('bf_sold_'+selectedDate)||'0');
       localStorage.setItem('bf_sold_'+selectedDate,String(prev+1));
@@ -607,6 +708,12 @@ function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
 function closeModal(){ document.getElementById('successModal').classList.remove('show'); }
 
 document.addEventListener('DOMContentLoaded',function(){
+  // ✅ FIX8: 인앱 감지 시 body 클래스 + 배너 표시
+  if(window.__isInApp){
+    document.body.classList.add('inapp-detected');
+    const banner = document.getElementById('inAppBanner');
+    if(banner) banner.classList.add('show');
+  }
   // GAS에서 식단+설정 로드 후 화면 초기화
   if(GAS_URL.includes('YOUR_DEPLOYMENT_ID')){
     // 데모 모드: localStorage/기본값 사용
@@ -616,6 +723,14 @@ document.addEventListener('DOMContentLoaded',function(){
     function initScreen(){ applyAccountInfo(); buildDateTabs(); checkOverlays(); }
     initScreen();
 
+    // ✅ FIX9: GAS 응답 20초 초과 시 현재 캐시/기본값으로 강제 완료
+    const __gasInitTimer = setTimeout(()=>{
+      console.warn('[FIX9] GAS 응답 20초 초과 — 기본값으로 강제 표시');
+      initScreen(); // 현재 캐시/기본값으로 재렌더
+      const dot = document.querySelector('.live-dot');
+      if(dot){ dot.style.background='#f59e0b'; dot.title='서버 응답 지연 — 기본값 표시중'; }
+    }, 20000);
+
     // getSettings 1회 호출 → 설정 반영 후 화면 갱신
     fetchFromGAS({action:'getSettings'},function(setRes,setErr){
       try{
@@ -624,9 +739,11 @@ document.addEventListener('DOMContentLoaded',function(){
           LS.set('account',{bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'});
           if(d.startTime||d.endTime) LS.set('time_settings',{start:cleanTime(d.startTime,'08:25'),end:cleanTime(d.endTime,'10:30')});
           if(d.soldoutManual!==undefined||d.soldoutMsg) LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+          clearTimeout(__gasInitTimer); // FIX9: 정상 응답 — 타이머 취소
           initScreen();
         }
       }catch(e){}
+      clearTimeout(__gasInitTimer); // 에러여도 타이머 취소
     });
 
     // getMenu 백그라운드 (화면 블로킹 없음)
