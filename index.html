@@ -616,18 +616,33 @@ document.addEventListener('DOMContentLoaded',function(){
     function initScreen(){ applyAccountInfo(); buildDateTabs(); checkOverlays(); }
     initScreen(); // localStorage 캐시로 즉시 화면 표시
 
-    // GAS에서 최신 데이터 병렬 로드 후 업데이트
-    let menuDone=false, settingsDone=false;
-    function onBothDone(){ if(menuDone&&settingsDone){ applyAccountInfo(); buildDateTabs(); checkOverlays(); } }
+   // getSettings 먼저 → 완료 후 화면 갱신
+fetchFromGAS({action:'getSettings'},function(setRes,setErr){
+  try{
+    if(!setErr&&setRes&&setRes.status==='ok'&&setRes.data){
+      const d=setRes.data;
+      const acct={bank:d.bank||'카카오뱅크',no:d.bankNo||'3333-13-8457612',owner:d.bankOwner||'최 광 균',amt:d.bankAmt||'1,000원'};
+      LS.set('account',acct);
+      if(d.startTime||d.endTime){
+        LS.set('time_settings',{start:cleanTime(d.startTime,'08:25'),end:cleanTime(d.endTime,'10:30')});
+      }
+      if(d.soldoutManual!==undefined||d.soldoutMsg){
+        LS.set('soldout_settings',{manual:d.soldoutManual==='true',msg:d.soldoutMsg||'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
+      }
+      initScreen();
+    }
+  }catch(e){}
+});
 
-    fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
-      try{
-        if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
-          LS.set('menu',menuRes.data);
-        }
-      }catch(e){}
-      menuDone=true; onBothDone();
-    });
+// getMenu는 백그라운드 — 화면 블로킹 없음
+fetchFromGAS({action:'getMenu'},function(menuRes,menuErr){
+  try{
+    if(!menuErr&&menuRes&&menuRes.status==='ok'&&menuRes.data&&Object.keys(menuRes.data).length>0){
+      LS.set('menu',menuRes.data);
+      buildDateTabs(); checkOverlays();
+    }
+  }catch(e){}
+});
 
     fetchFromGAS({action:'getSettings'},function(setRes,setErr){
       try{
