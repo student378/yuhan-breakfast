@@ -145,6 +145,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 .modal p{font-size:13px;color:var(--gray500);line-height:1.6;margin-bottom:14px}
 .modal-detail{background:var(--gray50);border-radius:9px;padding:11px;text-align:left;margin-bottom:14px;font-size:12px;color:var(--gray700);line-height:1.9}
 .modal-btn{width:100%;padding:11px;background:var(--primary);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer}
+.transfer-box{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:2px solid #93c5fd;border-radius:12px;padding:14px 16px;margin:14px 0 10px;text-align:left}
+.transfer-box .tb-title{font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:8px;letter-spacing:.5px}
+.transfer-box .tb-bank{font-size:13px;font-weight:800;color:#1e3a8a;margin-bottom:4px}
+.transfer-box .tb-no{font-size:20px;font-weight:900;color:#1d4ed8;letter-spacing:1px;margin-bottom:4px}
+.transfer-box .tb-amt{font-size:13px;color:#059669;font-weight:800}
+.copy-btn{width:100%;padding:10px;background:#1d4ed8;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:7px;display:flex;align-items:center;justify-content:center;gap:6px}
+.copy-btn:active{opacity:.85}
+.kakao-btn{width:100%;padding:10px;background:#FEE500;color:#000;border:none;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:7px;display:flex;align-items:center;justify-content:center;gap:6px}
+.copy-toast{font-size:11px;color:#059669;text-align:center;margin-bottom:8px;display:none}
 .loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:10px}
 .loading-overlay.show{display:flex}
 .spinner{width:38px;height:38px;border:4px solid var(--gray200);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
@@ -196,7 +205,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
         <div class="form-group">
           <label class="form-label">학과 <span class="req">*</span></label>
           <select class="form-select" id="dept">
-            <option value="">선택</option>
+            <option value="">-- 학과를 선택하세요 --</option>
             <option>기계시스템전공</option><option>전기공학전공</option><option>전자공학전공</option>
             <option>산업안전전공</option><option>산업디자인전공</option><option>컴퓨터소프트웨어전공</option>
             <option>소방설비안전전공</option><option>시각디자인전공</option><option>식품영양학과</option>
@@ -211,8 +220,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
             <option>유한생명화공전공</option><option>반려동물보건학과</option><option>스포츠재활전공</option>
             <option>작업치료과</option><option>방송연예전공</option><option>응급구조과</option>
             <option>반려동물산업전공</option><option>항공서비스학과</option><option>치위생과</option>
-            <option>기계시스템전공(심화)</option><option>시각디자인학과(심화)</option><option>보건의료행정학과(심화)</option>
-            <option>패션디자인전공(심화)</option><option>실내건축전공(심화)</option><option>사회복지전공(심화)</option>
+            <option>기계시스템공학과(심화)</option><option>시각디자인학과(심화)</option><option>보건의료행정학과(심화)</option>
+            <option>패션디자인학과(심화)</option><option>실내건축학과(심화)</option><option>사회복지학과(심화)</option>
+            <option>유한바이오제약학과(심화)</option><option>컴퓨터공학과(심화)</option>
           </select>
         </div>
         <div class="form-group">
@@ -282,9 +292,24 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 <div class="modal-overlay" id="successModal">
   <div class="modal">
     <div class="modal-icon">✅</div><h3>신청 완료!</h3>
-    <p>천원의 아침밥 신청이 완료되었습니다.<br>이용 당일 현장에서 결제 후 식사하세요.</p>
+    <p>천원의 아침밥 신청이 완료되었습니다.</p>
     <div class="modal-detail" id="successDetail"></div>
-    <button class="modal-btn" onclick="closeModal()">확인</button>
+    <!-- 계좌이체 UI (계좌이체 선택 시 표시) -->
+    <div class="transfer-box" id="transferBox" style="display:none">
+      <div class="tb-title">💳 계좌이체 안내</div>
+      <div class="tb-bank" id="tbBank">카카오뱅크</div>
+      <div class="tb-no" id="tbNo">3333-13-8457612</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:4px">예금주: <span id="tbOwner">최 광 균</span></div>
+      <div class="tb-amt">💰 이체 금액: <span id="tbAmt">1,000원</span></div>
+    </div>
+    <div id="copyToast" class="copy-toast">✅ 계좌번호가 복사되었습니다!</div>
+    <button class="copy-btn" id="copyBtn" style="display:none" onclick="copyAcctNo()">
+      📋 계좌번호 복사
+    </button>
+    <button class="kakao-btn" id="kakaoBtn" style="display:none" onclick="openKakaoBank()">
+      💛 카카오뱅크 앱 열기
+    </button>
+    <button class="modal-btn" onclick="closeModal()">확인 (닫기)</button>
   </div>
 </div>
 <div class="loading-overlay" id="loadingOverlay"><div class="spinner"></div><div style="font-size:13px;color:#374151;font-weight:600">신청 중...</div></div>
@@ -643,11 +668,102 @@ function submitApply(){
 }
 
 function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
-  document.getElementById('successDetail').innerHTML='<b>📅 이용일</b>: '+fDateKr(date)+'<br><b>🏫 학과/학년</b>: '+dept+' '+grade+'<br><b>🔢 학번</b>: '+sid+'<br><b>👤 성명</b>: '+name+'<br><b>⏰ 신청시간</b>: '+time+'<br><b>🍽️ 메뉴</b>: '+(menu||'정보 없음')+'<br><b>💳 결제</b>: '+pay;
+  document.getElementById('successDetail').innerHTML=
+    '<b>📅 이용일</b>: '+fDateKr(date)+
+    '<br><b>🏫 학과/학년</b>: '+dept+' '+grade+
+    '<br><b>🔢 학번</b>: '+sid+
+    '<br><b>👤 성명</b>: '+name+
+    '<br><b>⏰ 신청시간</b>: '+time+
+    '<br><b>🍽️ 메뉴</b>: '+(menu||'정보 없음')+
+    '<br><b>💳 결제</b>: '+pay;
+
+  // 계좌이체 선택 시 — 계좌이체 UI 표시
+  const isTransfer = (pay === '계좌이체');
+  const acct = LS.get('account',{bank:'카카오뱅크',no:'3333-13-8457612',owner:'최 광 균',amt:'1,000원'});
+
+  const tbBox  = document.getElementById('transferBox');
+  const cpBtn  = document.getElementById('copyBtn');
+  const kkBtn  = document.getElementById('kakaoBtn');
+  const toast  = document.getElementById('copyToast');
+
+  if(isTransfer){
+    // 계좌 정보 채우기
+    const el = id => document.getElementById(id);
+    el('tbBank').textContent  = acct.bank  || '카카오뱅크';
+    el('tbNo').textContent    = acct.no    || '3333-13-8457612';
+    el('tbOwner').textContent = acct.owner || '최 광 균';
+    el('tbAmt').textContent   = acct.amt   || '1,000원';
+    if(tbBox) tbBox.style.display = 'block';
+    if(cpBtn) cpBtn.style.display = 'flex';
+    // 카카오뱅크인 경우만 앱 버튼 표시
+    if(kkBtn) kkBtn.style.display = (acct.bank||'').includes('카카오') ? 'flex' : 'none';
+    if(toast) toast.style.display = 'none';
+  } else {
+    // 현금지급 — 계좌 UI 숨김
+    if(tbBox) tbBox.style.display = 'none';
+    if(cpBtn) cpBtn.style.display = 'none';
+    if(kkBtn) kkBtn.style.display = 'none';
+    if(toast) toast.style.display = 'none';
+  }
   document.getElementById('successModal').classList.add('show');
 }
 
-function closeModal(){ document.getElementById('successModal').classList.remove('show'); }
+function closeModal(){
+  document.getElementById('successModal').classList.remove('show');
+  // 모달 닫을 때 toast 초기화
+  const t = document.getElementById('copyToast');
+  if(t) t.style.display='none';
+}
+
+function copyAcctNo(){
+  const acct = LS.get('account',{no:'3333-13-8457612'});
+  const no = acct.no || '3333-13-8457612';
+  // 하이픈 제거한 숫자만 복사 (이체 시 편리)
+  const plain = no.replace(/-/g,'');
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(plain).then(function(){
+        showCopyToast();
+      }).catch(function(){
+        fallbackCopy(plain);
+      });
+    } else {
+      fallbackCopy(plain);
+    }
+  }catch(e){ fallbackCopy(plain); }
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ document.execCommand('copy'); showCopyToast(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+function showCopyToast(){
+  const t = document.getElementById('copyToast');
+  if(!t) return;
+  t.style.display = 'block';
+  setTimeout(function(){ t.style.display='none'; }, 2500);
+}
+
+function openKakaoBank(){
+  const acct = LS.get('account',{no:'3333-13-8457612',amt:'1,000원'});
+  // 카카오뱅크 앱 열기 (계좌번호 자동 입력은 공식 미지원 — 앱만 열림)
+  location.href = 'kakaobank://';
+  // 앱 미설치 시 스토어 이동 대비
+  setTimeout(function(){
+    var ua = navigator.userAgent.toLowerCase();
+    if(ua.indexOf('android') > -1){
+      // Android: Play Store
+    } else {
+      // iOS: App Store (이미 앱 열기 시도 후라 무시됨)
+    }
+  }, 2000);
+}
 
 document.addEventListener('DOMContentLoaded',function(){
   // GAS에서 식단+설정 로드 후 화면 초기화
