@@ -153,6 +153,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
 .copy-btn{width:100%;padding:10px;background:#1d4ed8;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:7px;display:flex;align-items:center;justify-content:center;gap:6px}
 .copy-btn:active{opacity:.85}
 .kakao-btn{width:100%;padding:10px;background:#FEE500;color:#000;border:none;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:7px;display:flex;align-items:center;justify-content:center;gap:6px}
+.toss-btn{width:100%;padding:10px;background:#4B5EF5;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-bottom:7px;display:flex;align-items:center;justify-content:center;gap:6px}
 .copy-toast{font-size:11px;color:#059669;text-align:center;margin-bottom:8px;display:none}
 .loading-overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.85);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:10px}
 .loading-overlay.show{display:flex}
@@ -309,6 +310,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--gray100);min-height:
     <button class="kakao-btn" id="kakaoBtn" style="display:none" onclick="openKakaoBank()">
       💛 카카오뱅크 앱 열기
     </button>
+    <button class="toss-btn" id="tossBtn" style="display:none" onclick="openTossBank()">
+      💙 토스뱅크 앱 열기
+    </button>
     <button class="modal-btn" onclick="closeModal()">확인 (닫기)</button>
   </div>
 </div>
@@ -405,13 +409,10 @@ function checkTimeState() {
 
 // ── 판매 종료 상태 ──
 function checkSoldOut(date) {
+  // 수량 초과 신청 허용 — 수동 판매종료만 체크
   const so = LS.get('soldout_settings',{manual:false,msg:'금일 천원의 아침밥 판매가 종료되었습니다. 감사합니다.'});
   if (so.manual) return true;
-  const MENU_DATA = getMenuData();
-  const info = MENU_DATA[date];
-  if (!info) return false;
-  const sold = parseInt(localStorage.getItem('bf_sold_'+date)||'0');
-  return sold >= info.qty;
+  return false; // 수량 도달해도 신청 가능 (현장 승인으로 관리)
 }
 
 // ── 계좌 정보 적용 ──
@@ -697,12 +698,16 @@ function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
     if(cpBtn) cpBtn.style.display = 'flex';
     // 카카오뱅크인 경우만 앱 버튼 표시
     if(kkBtn) kkBtn.style.display = (acct.bank||'').includes('카카오') ? 'flex' : 'none';
+    var tossBtn = document.getElementById('tossBtn');
+    if(tossBtn) tossBtn.style.display = (acct.bank||'').includes('토스') ? 'flex' : 'none';
     if(toast) toast.style.display = 'none';
   } else {
     // 현금지급 — 계좌 UI 숨김
     if(tbBox) tbBox.style.display = 'none';
     if(cpBtn) cpBtn.style.display = 'none';
     if(kkBtn) kkBtn.style.display = 'none';
+    var tossBtn0 = document.getElementById('tossBtn');
+    if(tossBtn0) tossBtn0.style.display = 'none';
     if(toast) toast.style.display = 'none';
   }
   document.getElementById('successModal').classList.add('show');
@@ -713,6 +718,8 @@ function closeModal(){
   // 모달 닫을 때 toast 초기화
   const t = document.getElementById('copyToast');
   if(t) t.style.display='none';
+  const tb = document.getElementById('tossBtn');
+  if(tb) tb.style.display='none';
 }
 
 function copyAcctNo(){
@@ -761,6 +768,20 @@ function openKakaoBank(){
       // Android: Play Store
     } else {
       // iOS: App Store (이미 앱 열기 시도 후라 무시됨)
+    }
+  }, 2000);
+}
+
+function openTossBank(){
+  // 토스뱅크 앱 열기
+  location.href = 'supertoss://';
+  // 앱 미설치 시 스토어로 이동
+  setTimeout(function(){
+    var ua = navigator.userAgent.toLowerCase();
+    if(ua.indexOf('android') > -1){
+      location.href = 'market://details?id=viva.republica.toss';
+    } else {
+      location.href = 'https://apps.apple.com/app/id839333328';
     }
   }, 2000);
 }
