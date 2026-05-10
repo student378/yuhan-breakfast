@@ -697,9 +697,10 @@ function showSuccess({dept,grade,sid,name,date,time,pay,menu}){
     if(tbBox) tbBox.style.display = 'block';
     if(cpBtn) cpBtn.style.display = 'flex';
     // 카카오뱅크인 경우만 앱 버튼 표시
-    if(kkBtn) kkBtn.style.display = (acct.bank||'').includes('카카오') ? 'flex' : 'none';
+    // 카카오뱅크, 토스뱅크 버튼 항상 표시
+    if(kkBtn) kkBtn.style.display = 'flex';
     var tossBtn = document.getElementById('tossBtn');
-    if(tossBtn) tossBtn.style.display = (acct.bank||'').includes('토스') ? 'flex' : 'none';
+    if(tossBtn) tossBtn.style.display = 'flex';
     if(toast) toast.style.display = 'none';
   } else {
     // 현금지급 — 계좌 UI 숨김
